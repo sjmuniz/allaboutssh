@@ -1,0 +1,15 @@
+05- Goodies.
+05.1 Keychain and other ssh-agent managers.
+https://www.funtoo.org/Keychain
+
+It checks if there is a running ssh-agent, or starts it and set environment
+variables accordingly so ssh is able to get keys from ssh-agent.
+Just add to your .bashrc:
+sjmuniz@tardis:~$ grep keychain .bashrc 
+#add keychain
+eval $(/usr/bin/keychain --eval)
+
+05.2 putty suite (puttygen, pageant, configure putty options)
+
+It is windows, and I refuse to base64 encode images here.
+

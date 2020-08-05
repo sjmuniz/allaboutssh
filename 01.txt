@@ -1,0 +1,18 @@
+01- ssh intro.
+    - Need to remote manage and use remote servers with ease and security.
+    - Secure shell was started in 1995 and provides strong authentication,
+      confidentiality and availability.
+    - Run in every server known to mankind.
+    - But.. but... MS Windows.
+    - Openssh server and client is te most popular implementation, 
+      but there are others, most notably clients: putty, SecureCRT, etcs.
+    - IETF has build many RFCs for ssh protocol and standarized its methods
+      ( https://en.wikipedia.org/wiki/Secure_Shell#Standards_documentation )
+
+01.1 why? telnet vs ssh
+    - telnet is from 1969, and lacks many features. We should always avoid it.
+    - ssh is extremely simple but provides many features.
+    - It is not a tool but more akin of a tool box.
+    - At this point we should all be using SSH-2, although there is backwards
+      compatibility for old, venerable SSH-1 that we should promptly disable.
+

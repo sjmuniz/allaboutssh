@@ -1,0 +1,233 @@
+03- Authentication methods.
+---------------------------
+
+03.1 Understanding fingerprints
+-------------------------------
+A fingerprint is a (usually) SHA-1 or SHA-2 hash of a public or private key.
+It is use to quickly identify a key.
+ssh client will verify remote server fingerprint as a way to authenticate the server.
+If unknown, it will ask the user, and if the user confirms it will store it at
+the "host key cache", usually at
+~/.ssh/known_hosts
+In high security environments fingerprints are published in advance so users can 
+visually verify them before trusting and saving them.
+A fingerprint is tied to a hostname at the local "host key cache" and ssh client
+will verify and issue a big fat warning if the same hostname changes its host key.
+
+--
+sjmuniz@tardis:~$ ssh ssh01
+The authenticity of host 'ssh01 (192.168.99.31)' can't be established.
+ECDSA key fingerprint is SHA256:/AgmNf10yRqmFCKeZDEDS06N5Ps1Bmxt7NNA4SIFFSU.
+Are you sure you want to continue connecting (yes/no/[fingerprint])? yes
+Warning: Permanently added 'ssh01' (ECDSA) to the list of known hosts.
+sjmuniz@ssh01's password: 
+Last login: Wed Jul 22 14:23:25 2020 from 192.168.99.169
+sjmuniz@ssh01:~$ logout
+Connection to ssh01 closed.
+sjmuniz@tardis:~$ 
+
+sjmuniz@tardis:~$ ssh ssh01
+sjmuniz@ssh01's password: 
+Last login: Wed Jul 22 14:26:55 2020 from 192.168.99.169
+sjmuniz@ssh01:~$ 
+
+Here we can see the server side fingerprint, which matches what the client received.
+root@ssh01:/etc/ssh# ssh-keygen -l -f ssh_host_ecdsa_key
+256 SHA256:/AgmNf10yRqmFCKeZDEDS06N5Ps1Bmxt7NNA4SIFFSU root@deb10 (ECDSA)
+--
+Fingerprint mismatch:
+Eg:
+sjmuniz@tardis:~$ ssh ssh01
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+@    WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!     @
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+IT IS POSSIBLE THAT SOMEONE IS DOING SOMETHING NASTY!
+Someone could be eavesdropping on you right now (man-in-the-middle attack)!
+It is also possible that a host key has just been changed.
+The fingerprint for the ECDSA key sent by the remote host is
+SHA256:SilkKic1GjaIq603AVGcPxm5c8OEBSB77HMTIdQiGJs.
+Please contact your system administrator.
+Add correct host key in /home/sjmuniz/.ssh/known_hosts to get rid of this message.
+Offending ECDSA key in /home/sjmuniz/.ssh/known_hosts:106
+  remove with:
+  ssh-keygen -f "/home/sjmuniz/.ssh/known_hosts" -R "192.168.99.31"
+ECDSA host key for 192.168.99.31 has changed and you have requested strict checking.
+Host key verification failed.
+
+To check fingerprints we use:
+$ ssh-keygen -lf <key>
+
+03.2 Passwords
+--------------
+The usual way to authenticate a user is via passwords.
+Not a lot to say other than using passwords should be discouraged, since people
+tengo to use simple passwords and reuse them.
+From the server side, there are many options to choose a backend for passwords.
+The most common is "files", which means sshd uses PAM to authenticate against local
+/etc/passwd and /etc/shadow files.
+
+03.3 Keys (host keys, user key generation, storage, perms ssh-agent)
+--------------------------------------------------------------------
+SSH supports authentication via keys.
+There are two layers of security.
+- host keys: used to authenticate client against server.
+- user keys: used to authenticate user against server.
+
+This is more complex than passwords, but has the added benefit of more security
+and extremely simplicity (once it is deployed).
+
+How to create user keys:
+
+sjmuniz@tardis:~/keys$ ssh-keygen 
+Generating public/private rsa key pair.
+Enter file in which to save the key (/home/sjmuniz/.ssh/id_rsa): allaboutssh-nopassphrase
+Enter passphrase (empty for no passphrase): 
+Enter same passphrase again: 
+Your identification has been saved in allaboutssh-nopassphrase
+Your public key has been saved in allaboutssh-nopassphrase.pub
+The key fingerprint is:
+SHA256:arg3Bgw9uiyNT1p7ddrHm3CoGuLXxKmArl+7TBSUiS8 sjmuniz@tardis
+The key's randomart image is:
++---[RSA 3072]----+
+|   ..o           |
+|  ..o            |
+|   o.            |
+|  E +.           |
+| . =.o .S        |
+|. o.o.=...       |
+|.++o=*o+o..      |
+|o*+*+=*..oo.     |
+|++=o*=.. .o.     |
++----[SHA256]-----+
+sjmuniz@tardis:~/keys$ ssh-keygen 
+Generating public/private rsa key pair.
+Enter file in which to save the key (/home/sjmuniz/.ssh/id_rsa): allaboutssh-withpassphrase
+Enter passphrase (empty for no passphrase): <allaboutssh>
+Enter same passphrase again: <allaboutssh>
+Your identification has been saved in allaboutssh-withpassphrase
+Your public key has been saved in allaboutssh-withpassphrase.pub
+The key fingerprint is:
+SHA256:MP7GbmigfGG41V6v1aKWQFVBToADNDAfclyyScAknRg sjmuniz@tardis
+The key's randomart image is:
++---[RSA 3072]----+
+|E***Oo...+=.     |
+|..+*.*o .o       |
+|    + oo  .      |
+|     ..o         |
+|   . o. S        |
+|  . = oo.  .     |
+| . = + ++oo .    |
+|  + . +o+o..     |
+|   . . o+.       |
++----[SHA256]-----+
+sjmuniz@tardis:~/keys$ ls -l
+total 16
+-rw------- 1 sjmuniz sjmuniz 2602 jul 22 14:44 allaboutssh-nopassphrase
+-rw-r--r-- 1 sjmuniz sjmuniz  568 jul 22 14:44 allaboutssh-nopassphrase.pub
+-rw------- 1 sjmuniz sjmuniz 2655 jul 22 14:44 allaboutssh-withpassphrase
+-rw-r--r-- 1 sjmuniz sjmuniz  568 jul 22 14:44 allaboutssh-withpassphrase.pub
+
+Show same procedure in putty.
+
+Private and public keys are matched, meaning that pub keys can be derived and 
+match with the private key.
+To use keys as a mean of authentication, a public key is sent to the server,
+and the client who posses the private part can show it as a way to prove his identity.
+
+Let's setup keys to authenticate against ssh01.
+-----------------------------------------------
+sjmuniz@tardis:~/keys$ ssh-copy-id -i allaboutssh-nopassphrase.pub ssh01
+/usr/bin/ssh-copy-id: INFO: Source of key(s) to be installed: "allaboutssh-nopassphrase.pub"
+/usr/bin/ssh-copy-id: INFO: attempting to log in with the new key(s), to filter out any that are already installed
+/usr/bin/ssh-copy-id: INFO: 1 key(s) remain to be installed -- if you are prompted now it is to install the new keys
+sjmuniz@ssh01's password: <password>
+
+Number of key(s) added: 1
+
+Now try logging into the machine, with:   "ssh 'ssh01'"
+and check to make sure that only the key(s) you wanted were added.
+
+sjmuniz@tardis:~/keys$ ssh -i allaboutssh-nopassphrase ssh01
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+@         WARNING: UNPROTECTED PRIVATE KEY FILE!          @
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+Permissions 0644 for 'allaboutssh-nopassphrase.pub' are too open.
+It is required that your private key files are NOT accessible by others.
+This private key will be ignored.
+Load key "allaboutssh-nopassphrase": bad permissions
+sjmuniz@ssh01's password: 
+
+sjmuniz@tardis:~/keys$ chmod 400 allaboutssh-nopassphrase
+sjmuniz@tardis:~/keys$ ssh -i allaboutssh-nopassphrase ssh01
+Last login: Wed Jul 22 14:27:03 2020 from 192.168.99.169
+sjmuniz@ssh01:~$
+
+03.4 Keys with passphrases
+--------------------------
+This is all an good, but if our ssh private key is compromised, stolen, etcs, anyone can impersonate us at ssh01.
+That is why you can add a passphrase to a key.
+
+jmuniz@tardis:~/keys$ ssh-copy-id -i allaboutssh-withpassphrase.pub ssh01
+/usr/bin/ssh-copy-id: INFO: Source of key(s) to be installed: "allaboutssh-withpassphrase.pub"
+/usr/bin/ssh-copy-id: INFO: attempting to log in with the new key(s), to filter out any that are already installed
+/usr/bin/ssh-copy-id: INFO: 1 key(s) remain to be installed -- if you are prompted now it is to install the new keys
+sjmuniz@ssh01's password: 
+
+Number of key(s) added: 1
+
+Now try logging into the machine, with:   "ssh 'ssh01'"
+and check to make sure that only the key(s) you wanted were added.
+
+sjmuniz@tardis:~/keys$ chmod 400 *
+sjmuniz@tardis:~/keys$ ssh -i allaboutssh-withpassphrase ssh01
+Enter passphrase for key 'allaboutssh-withpassphrase': 
+Last login: Wed Jul 22 14:50:57 2020 from 192.168.99.169
+sjmuniz@ssh01:~$
+
+--
+
+At the remote pub keys are saved at ~/.ssh/authorized_keys
+sjmuniz@ssh01:~$ cat .ssh/authorized_keys 
+ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDY7haP5N6cybaA2/LNvSl1k8t/vtyEukUY5wVjmG30V6osm9ITBUs+AEFxmI19wBORhETLfaxPXuB3dOVsBnuLnHCQiI8YJX6enKpRepWB2mW1ycn5FemnLJZAQhNk6LS2r4QvdCKbvFPuHmNK0Juf7bTkTwPdaWtERAx7V2M9lxABncTbugCeKvtxz4q9ALOySDBGjCEf2HGg7QnWVYJPOq8D9Ogu2OZvXVIlft0z2Ne2cc1bfoClCf9JZ4zT10rvR6cK7aWq8KzTc0fKxk2kVBkRZnj+Meq5vDArwYK5wfbzNvT+PWOyqmOFEygoBqPPyilcO0+BVhNtbOM0hPpZ5jvu95W2HUOW6j07M3ABWlY6EtcRBh8uY6ULttcp5boE/ePlzrNlbDuEfu6RH/PAGDcl2TevcqqAAqBzOy1IVdrXLZC32VkqMrjRvhpg8tUTIBZweBOhApWpO+PqKo7HslIztfZNC6fr/3jVCIsFoc1Gs2z6lv4lTUMSSjT9P0k= sjmuniz@tardis
+ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC76nHvDyeYdDxK5OE+2R9tTo7grhP+WTITTjyL6LBHU62au7fBr8/K5U+1AScM0gvxHf7mXojVdoFCiQyqT7N8juev7VgtgdIBq58WL2ieLww7KmOYHtYX1UthLqj7yl10gJ3TzTtnF2zdF9naZlXTMM6MnanJyvLCaO/NPTaHi9wBu6zGsON8qLXy+iSm1ZmroSi4QtNRNiaz+XDFYuKcpvmnz9qWFDvrh4Ku32P8Vaq0nItF9Nr4+vaLdpQJrt5RX41hiw51t0j8tp5eoR4Vs8KCoPGDv4jAdod+327gJ6dTmpcfz6r35iMPFA+W9Fh8bRIxrkbwwGSYGohktsyCHe5aDPiFWtI5pv/ojOgGwM+WST09WPCP/+fg8wNtuG9ew7wiMSXkQpXx9cuPeMHKQiPkmDclkY/3adx1KUizpdhW3jFngAyy5I8CoPbNrKvO3lTD8/pc/EytQjBjHhLg1+YbtAu3egADQa+eZZ8i2N2LKhlqa9A4gO/y64ep8K8= sjmuniz@tardis
+
+sjmuniz@tardis:~/keys$ cat allaboutssh-nopassphrase.pub allaboutssh-withpassphrase.pub 
+ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDY7haP5N6cybaA2/LNvSl1k8t/vtyEukUY5wVjmG30V6osm9ITBUs+AEFxmI19wBORhETLfaxPXuB3dOVsBnuLnHCQiI8YJX6enKpRepWB2mW1ycn5FemnLJZAQhNk6LS2r4QvdCKbvFPuHmNK0Juf7bTkTwPdaWtERAx7V2M9lxABncTbugCeKvtxz4q9ALOySDBGjCEf2HGg7QnWVYJPOq8D9Ogu2OZvXVIlft0z2Ne2cc1bfoClCf9JZ4zT10rvR6cK7aWq8KzTc0fKxk2kVBkRZnj+Meq5vDArwYK5wfbzNvT+PWOyqmOFEygoBqPPyilcO0+BVhNtbOM0hPpZ5jvu95W2HUOW6j07M3ABWlY6EtcRBh8uY6ULttcp5boE/ePlzrNlbDuEfu6RH/PAGDcl2TevcqqAAqBzOy1IVdrXLZC32VkqMrjRvhpg8tUTIBZweBOhApWpO+PqKo7HslIztfZNC6fr/3jVCIsFoc1Gs2z6lv4lTUMSSjT9P0k= sjmuniz@tardis
+ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC76nHvDyeYdDxK5OE+2R9tTo7grhP+WTITTjyL6LBHU62au7fBr8/K5U+1AScM0gvxHf7mXojVdoFCiQyqT7N8juev7VgtgdIBq58WL2ieLww7KmOYHtYX1UthLqj7yl10gJ3TzTtnF2zdF9naZlXTMM6MnanJyvLCaO/NPTaHi9wBu6zGsON8qLXy+iSm1ZmroSi4QtNRNiaz+XDFYuKcpvmnz9qWFDvrh4Ku32P8Vaq0nItF9Nr4+vaLdpQJrt5RX41hiw51t0j8tp5eoR4Vs8KCoPGDv4jAdod+327gJ6dTmpcfz6r35iMPFA+W9Fh8bRIxrkbwwGSYGohktsyCHe5aDPiFWtI5pv/ojOgGwM+WST09WPCP/+fg8wNtuG9ew7wiMSXkQpXx9cuPeMHKQiPkmDclkY/3adx1KUizpdhW3jFngAyy5I8CoPbNrKvO3lTD8/pc/EytQjBjHhLg1+YbtAu3egADQa+eZZ8i2N2LKhlqa9A4gO/y64ep8K8= sjmuniz@tardis
+
+Using ssh-agent
+---------------
+While using keys is safer, it is also harder, in other words:
+Security at the expense of usability comes at the expense of security.
+and hardly anyone uses keys with passphrase.
+The solution is to have an agent (ssh-agent) which holds the keys and pass them along to ssh as needed.
+In this way the keys will be hold in memory, and the passphrase has to be provided a single time, when starting the agent.
+
+sjmuniz@tardis:~/keys$ eval $(ssh-agent)
+Agent pid 63743
+sjmuniz@tardis:~/keys$ ssh-add -L
+The agent has no identities.
+sjmuniz@tardis:~/keys$ ssh-add allaboutssh-nopassphrase
+Identity added: allaboutssh-nopassphrase (sjmuniz@tardis)
+sjmuniz@tardis:~/keys$ ssh-add -L
+ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDY7haP5N6cybaA2/LNvSl1k8t/vtyEukUY5wVjmG30V6osm9ITBUs+AEFxmI19wBORhETLfaxPXuB3dOVsBnuLnHCQiI8YJX6enKpRepWB2mW1ycn5FemnLJZAQhNk6LS2r4QvdCKbvFPuHmNK0Juf7bTkTwPdaWtERAx7V2M9lxABncTbugCeKvtxz4q9ALOySDBGjCEf2HGg7QnWVYJPOq8D9Ogu2OZvXVIlft0z2Ne2cc1bfoClCf9JZ4zT10rvR6cK7aWq8KzTc0fKxk2kVBkRZnj+Meq5vDArwYK5wfbzNvT+PWOyqmOFEygoBqPPyilcO0+BVhNtbOM0hPpZ5jvu95W2HUOW6j07M3ABWlY6EtcRBh8uY6ULttcp5boE/ePlzrNlbDuEfu6RH/PAGDcl2TevcqqAAqBzOy1IVdrXLZC32VkqMrjRvhpg8tUTIBZweBOhApWpO+PqKo7HslIztfZNC6fr/3jVCIsFoc1Gs2z6lv4lTUMSSjT9P0k= sjmuniz@tardis
+sjmuniz@tardis:~/keys$ ssh ssh01
+Last login: Wed Jul 22 14:58:16 2020 from 192.168.99.169
+sjmuniz@ssh01:~$ logout
+Connection to ssh01 closed.
+
+sjmuniz@tardis:~/keys$ ssh-add -D
+All identities removed.
+
+sjmuniz@tardis:~/keys$ ssh-add allaboutssh-withpassphrase
+Enter passphrase for allaboutssh-withpassphrase: 
+Identity added: allaboutssh-withpassphrase (sjmuniz@tardis)
+sjmuniz@tardis:~/keys$ ssh-add -L
+ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC76nHvDyeYdDxK5OE+2R9tTo7grhP+WTITTjyL6LBHU62au7fBr8/K5U+1AScM0gvxHf7mXojVdoFCiQyqT7N8juev7VgtgdIBq58WL2ieLww7KmOYHtYX1UthLqj7yl10gJ3TzTtnF2zdF9naZlXTMM6MnanJyvLCaO/NPTaHi9wBu6zGsON8qLXy+iSm1ZmroSi4QtNRNiaz+XDFYuKcpvmnz9qWFDvrh4Ku32P8Vaq0nItF9Nr4+vaLdpQJrt5RX41hiw51t0j8tp5eoR4Vs8KCoPGDv4jAdod+327gJ6dTmpcfz6r35iMPFA+W9Fh8bRIxrkbwwGSYGohktsyCHe5aDPiFWtI5pv/ojOgGwM+WST09WPCP/+fg8wNtuG9ew7wiMSXkQpXx9cuPeMHKQiPkmDclkY/3adx1KUizpdhW3jFngAyy5I8CoPbNrKvO3lTD8/pc/EytQjBjHhLg1+YbtAu3egADQa+eZZ8i2N2LKhlqa9A4gO/y64ep8K8= sjmuniz@tardis
+sjmuniz@tardis:~/keys$ ssh ssh01
+Last login: Wed Jul 22 15:29:06 2020 from 192.168.99.169
+sjmuniz@ssh01:~$ logout
+Connection to ssh01 closed.
+
+Show same procedure in putty using putty-gen and pageant.
+

@@ -1,0 +1,304 @@
+02- ssh architecture and design
+-------------------------------
+02.1 Client-Server model (ssh in Linux and windows)
+---------------------------------------------------
+
+Secure shell uses a client-server model.
+The client, usually openssh-client, is called "ssh" and the server side part
+is called "sshd" (notice the d from daemon in sshd).
+Client A (tardis) initiates the exchange with server B (ssh01) on tcp port 22 by default.
+From the client perspective:
+  1- Connects and negociates ssh version (SSH-2)
+  2- Initiates the key exchange for encryption, agree on cyphers.
+  3- Verifies hosts keys or offers a way for the user to approve remote fingerprint.
+  4- over this now secure channel it asks which authentication methods are supported.
+  5- authenticates usually using passwords or ssh keys.
+  6- run a remote shell for an interactive session.
+  7- Configures remote environment variables such as language.
+
+02.2 ssh client side config
+--------------------------------
+ssh client uses global and user configurations.
+Global is at /etc/ssh/ssh_client and is system wide.
+Most system wide parameters can be overriden at user config file.
+User  ssh_config file usually lives at
+~/.ssh/config
+You can add entries for each host specifying any of the numerous man ssh_config options.
+Eg:
+sjmuniz@tardis:~$ tail -n6 .ssh/config
+host ssh01
+  user sjmuniz
+  port 22
+  hostname 192.168.99.31
+# IdentityFile ~/.ssh/id_rsa
+
+and now you can directly 
+$ ssh ssh01
+and ssh will look up ssh01 in the config file.
+
+02.3 ssh server side config
+---------------------------
+In the same way, the server has a
+/etc/ssh/sshd_config file that configures the server parameters,
+and users can not change them.
+
+User server side config is at ~/.ssh/authorized_keys
+THis file contains the pub keys used to authenticate incomming connections.
+
+02.4 Debugging ssh (client and server side)
+-------------------------------------------
+Debugging client side is easy using the -v client option.
+
+Here is a standard negociation:
+-------------------------------
+1)
+sjmuniz@tardis:~$ ssh -v ssh01
+OpenSSH_7.6p1 Ubuntu-4ubuntu0.3, OpenSSL 1.0.2n  7 Dec 2017
+debug1: Reading configuration data /b/sjmuniz/.ssh/config
+debug1: Reading configuration data /etc/ssh/ssh_config
+debug1: /etc/ssh/ssh_config line 19: Applying options for *
+debug1: Connecting to ssh01 [192.168.99.31] port 22.
+debug1: Connection established.
+debug1: Local version string SSH-2.0-OpenSSH_7.6p1 Ubuntu-4ubuntu0.3
+debug1: Remote protocol version 2.0, remote software version OpenSSH_7.9p1 Debian-10+deb10u2
+debug1: match: OpenSSH_7.9p1 Debian-10+deb10u2 pat OpenSSH* compat 0x04000000
+debug1: Authenticating to ssh01:22 as 'sjmuniz'
+
+2)
+debug1: SSH2_MSG_KEXINIT sent
+debug1: SSH2_MSG_KEXINIT received
+debug1: kex: algorithm: curve25519-sha256
+debug1: kex: host key algorithm: ecdsa-sha2-nistp256
+debug1: kex: server->client cipher: chacha20-poly1305@openssh.com MAC: <implicit> compression: none
+debug1: kex: client->server cipher: chacha20-poly1305@openssh.com MAC: <implicit> compression: none
+debug1: expecting SSH2_MSG_KEX_ECDH_REPLY
+
+3)
+debug1: Server host key: ecdsa-sha2-nistp256 SHA256:/AgmNf10yRqmFCKeZDEDS06N5Ps1Bmxt7NNA4SIFFSU
+The authenticity of host 'ssh01 (192.168.99.31)' can't be established.
+ECDSA key fingerprint is SHA256:/AgmNf10yRqmFCKeZDEDS06N5Ps1Bmxt7NNA4SIFFSU.
+Are you sure you want to continue connecting (yes/no)? yes
+Warning: Permanently added 'ssh01,192.168.99.31' (ECDSA) to the list of known hosts.
+debug1: rekey after 134217728 blocks
+debug1: SSH2_MSG_NEWKEYS sent
+debug1: expecting SSH2_MSG_NEWKEYS
+debug1: SSH2_MSG_NEWKEYS received
+debug1: rekey after 134217728 blocks
+debug1: SSH2_MSG_EXT_INFO received
+debug1: kex_input_ext_info: server-sig-algs=<ssh-ed25519,ssh-rsa,rsa-sha2-256,rsa-sha2-512,ssh-dss,ecdsa-sha2-nistp256,ecdsa-sha2-nistp384,ecdsa-sha2-nistp521>
+debug1: SSH2_MSG_SERVICE_ACCEPT received
+
+4)
+debug1: Authentications that can continue: publickey,password
+debug1: Next authentication method: publickey
+debug1: Offering public key: RSA SHA256:8qRxSxcQVDrL/ghaxxgJnzjlaosOxGSTgq7itOMdhv4 /b/sjmuniz/.ssh/id_rsa
+
+5)
+debug1: Authentications that can continue: publickey,password
+debug1: Trying private key: /b/sjmuniz/.ssh/id_dsa
+debug1: Trying private key: /b/sjmuniz/.ssh/id_ecdsa
+debug1: Trying private key: /b/sjmuniz/.ssh/id_ed25519
+debug1: Next authentication method: password
+sjmuniz@ssh01's password: 
+debug1: Authentication succeeded (password).
+Authenticated to ssh01 ([192.168.99.31]:22).
+debug1: channel 0: new [client-session]
+debug1: Requesting no-more-sessions@openssh.com
+
+6)
+debug1: Entering interactive session.
+debug1: pledge: network
+debug1: client_input_global_request: rtype hostkeys-00@openssh.com want_reply 0
+
+7)
+debug1: Sending environment.
+debug1: Sending env LC_ALL = C
+debug1: Sending env LC_MEASUREMENT = es_AR.UTF-8
+debug1: Sending env LC_PAPER = es_AR.UTF-8
+debug1: Sending env LC_MONETARY = es_AR.UTF-8
+debug1: Sending env LANG = en_US.UTF-8
+debug1: Sending env LC_NAME = es_AR.UTF-8
+debug1: Sending env LC_ADDRESS = es_AR.UTF-8
+debug1: Sending env LC_NUMERIC = es_AR.UTF-8
+debug1: Sending env LC_MESSAGES = en_US.UTF-8
+debug1: Sending env LC_TELEPHONE = es_AR.UTF-8
+debug1: Sending env LC_IDENTIFICATION = es_AR.UTF-8
+debug1: Sending env LC_TIME = es_AR.UTF-8
+Linux ssh01 4.19.0-9-amd64 #1 SMP Debian 4.19.118-2+deb10u1 (2020-06-07) x86_64
+
+The programs included with the Debian GNU/Linux system are free software;
+the exact distribution terms for each program are described in the
+individual files in /usr/share/doc/*/copyright.
+
+Debian GNU/Linux comes with ABSOLUTELY NO WARRANTY, to the extent
+permitted by applicable law.
+Last login: Mon Jul 20 15:20:30 2020 from 192.168.99.169
+sjmuniz@ssh01:~$
+
+--
+
+Debugging server side usually involves running sshd with a separate configuration file,
+in a different port and in debug mode so it echoes his decisions.
+Here is a debug session:
+------------------------
+On the server we copy sshd configuration, change the Port stanza and run it with the new configuration.
+sjmuniz@ssh01:/tmp$ sudo cp /etc/ssh/sshd_config .
+sjmuniz@ssh01:/tmp$ sudo vi sshd_config
+sjmuniz@ssh01:/tmp$ grep Port sshd_config
+Port 2233
+sjmuniz@ssh01:/tmp$ sudo /usr/sbin/sshd -e -d -f /tmp/sshd_config 
+debug1: sshd version OpenSSH_7.9, OpenSSL 1.1.1d  10 Sep 2019
+debug1: private host key #0: ssh-rsa SHA256:l/T6K8HscI5OZRZMRBqpxnOHNgzRjqmwzTjA03JBS7o
+debug1: private host key #1: ecdsa-sha2-nistp256 SHA256:/AgmNf10yRqmFCKeZDEDS06N5Ps1Bmxt7NNA4SIFFSU
+debug1: private host key #2: ssh-ed25519 SHA256:7WCbtGDnaGPOtuLMbKVXTVvfPoxoaLjhPYBygbeV7LY
+debug1: rexec_argv[0]='/usr/sbin/sshd'
+debug1: rexec_argv[1]='-e'
+debug1: rexec_argv[2]='-d'
+debug1: rexec_argv[3]='-f'
+debug1: rexec_argv[4]='/tmp/sshd_config'
+debug1: Set /proc/self/oom_score_adj from 0 to -1000
+debug1: Bind to port 2233 on 0.0.0.0.
+Server listening on 0.0.0.0 port 2233.
+debug1: Bind to port 2233 on ::.
+Server listening on :: port 2233.
+--
+Now we initiate a connection from the client side:
+sjmuniz@tardis:~$ ssh -p2233 ssh01
+sjmuniz@ssh01's password: 
+
+And see at the server side:
+
+debug1: Bind to port 2233 on ::.
+Server listening on :: port 2233.
+debug1: Server will not fork when running in debugging mode.
+debug1: rexec start in 5 out 5 newsock 5 pipe -1 sock 8
+debug1: sshd version OpenSSH_7.9, OpenSSL 1.1.1d  10 Sep 2019
+debug1: private host key #0: ssh-rsa SHA256:l/T6K8HscI5OZRZMRBqpxnOHNgzRjqmwzTjA03JBS7o
+debug1: private host key #1: ecdsa-sha2-nistp256 SHA256:/AgmNf10yRqmFCKeZDEDS06N5Ps1Bmxt7NNA4SIFFSU
+debug1: private host key #2: ssh-ed25519 SHA256:7WCbtGDnaGPOtuLMbKVXTVvfPoxoaLjhPYBygbeV7LY
+debug1: inetd sockets after dupping: 3, 3
+Connection from 192.168.99.169 port 57998 on 192.168.99.31 port 2233
+debug1: Client protocol version 2.0; client software version OpenSSH_8.2p1 Ubuntu-4ubuntu0.1
+debug1: match: OpenSSH_8.2p1 Ubuntu-4ubuntu0.1 pat OpenSSH* compat 0x04000000
+debug1: Local version string SSH-2.0-OpenSSH_7.9p1 Debian-10+deb10u2
+debug1: permanently_set_uid: 106/65534 [preauth]
+debug1: list_hostkey_types: rsa-sha2-512,rsa-sha2-256,ssh-rsa,ecdsa-sha2-nistp256,ssh-ed25519 [preauth]
+debug1: SSH2_MSG_KEXINIT sent [preauth]
+debug1: SSH2_MSG_KEXINIT received [preauth]
+debug1: kex: algorithm: curve25519-sha256 [preauth]
+debug1: kex: host key algorithm: ecdsa-sha2-nistp256 [preauth]
+debug1: kex: client->server cipher: chacha20-poly1305@openssh.com MAC: <implicit> compression: none [preauth]
+debug1: kex: server->client cipher: chacha20-poly1305@openssh.com MAC: <implicit> compression: none [preauth]
+debug1: expecting SSH2_MSG_KEX_ECDH_INIT [preauth]
+debug1: rekey after 134217728 blocks [preauth]
+debug1: SSH2_MSG_NEWKEYS sent [preauth]
+debug1: expecting SSH2_MSG_NEWKEYS [preauth]
+debug1: SSH2_MSG_NEWKEYS received [preauth]
+debug1: rekey after 134217728 blocks [preauth]
+debug1: KEX done [preauth]
+debug1: userauth-request for user sjmuniz service ssh-connection method none [preauth]
+debug1: attempt 0 failures 0 [preauth]
+debug1: PAM: initializing for "sjmuniz"
+debug1: PAM: setting PAM_RHOST to "192.168.99.169"
+debug1: PAM: setting PAM_TTY to "ssh"
+debug1: userauth-request for user sjmuniz service ssh-connection method publickey [preauth]
+debug1: attempt 1 failures 0 [preauth]
+debug1: userauth_pubkey: test pkalg rsa-sha2-512 pkblob RSA SHA256:PURADVAXrqGD6YoUKPN4QYkj0p018PW37fdqo8qLIiM [preauth]
+debug1: temporarily_use_uid: 1000/1000 (e=0/0)
+debug1: trying public key file /home/sjmuniz/.ssh/authorized_keys
+debug1: fd 4 clearing O_NONBLOCK
+debug1: restore_uid: 0/0
+debug1: temporarily_use_uid: 1000/1000 (e=0/0)
+debug1: trying public key file /home/sjmuniz/.ssh/authorized_keys2
+debug1: Could not open authorized keys '/home/sjmuniz/.ssh/authorized_keys2': No such file or directory
+debug1: restore_uid: 0/0
+Failed publickey for sjmuniz from 192.168.99.169 port 57998 ssh2: RSA SHA256:PURADVAXrqGD6YoUKPN4QYkj0p018PW37fdqo8qLIiM
+debug1: userauth-request for user sjmuniz service ssh-connection method publickey [preauth]
+debug1: attempt 2 failures 1 [preauth]
+debug1: userauth_pubkey: test pkalg rsa-sha2-512 pkblob RSA SHA256:tjJd294R63LF4Kto+dIkGjaz4aUmaKKXyLVT7pS7w/Y [preauth]
+debug1: temporarily_use_uid: 1000/1000 (e=0/0)
+debug1: trying public key file /home/sjmuniz/.ssh/authorized_keys
+debug1: fd 4 clearing O_NONBLOCK
+debug1: restore_uid: 0/0
+debug1: temporarily_use_uid: 1000/1000 (e=0/0)
+debug1: trying public key file /home/sjmuniz/.ssh/authorized_keys2
+debug1: Could not open authorized keys '/home/sjmuniz/.ssh/authorized_keys2': No such file or directory
+debug1: restore_uid: 0/0
+Failed publickey for sjmuniz from 192.168.99.169 port 57998 ssh2: RSA SHA256:tjJd294R63LF4Kto+dIkGjaz4aUmaKKXyLVT7pS7w/Y
+
+--
+Once we enter our password we can see this at the server side.
+debug1: userauth-request for user sjmuniz service ssh-connection method password [preauth]
+debug1: attempt 3 failures 2 [preauth]
+debug1: PAM: password authentication accepted for sjmuniz
+debug1: do_pam_account: called
+Accepted password for sjmuniz from 192.168.99.169 port 57998 ssh2
+debug1: monitor_child_preauth: sjmuniz has been authenticated by privileged process
+debug1: monitor_read_log: child log fd closed
+debug1: PAM: establishing credentials
+User child is on pid 842
+debug1: SELinux support disabled
+debug1: PAM: establishing credentials
+debug1: permanently_set_uid: 1000/1000
+debug1: rekey after 134217728 blocks
+debug1: rekey after 134217728 blocks
+debug1: ssh_packet_set_postauth: called
+debug1: active: key options: agent-forwarding port-forwarding pty user-rc x11-forwarding
+debug1: Entering interactive session for SSH2.
+debug1: server_init_dispatch
+debug1: server_input_channel_open: ctype session rchan 0 win 1048576 max 16384
+debug1: input_session_request
+debug1: channel 0: new [server-session]
+debug1: session_new: session 0
+debug1: session_open: channel 0
+debug1: session_open: session 0: link with channel 0
+debug1: server_input_channel_open: confirm session
+debug1: server_input_global_request: rtype no-more-sessions@openssh.com want_reply 0
+debug1: server_input_channel_req: channel 0 request pty-req reply 1
+debug1: session_by_channel: session 0 channel 0
+debug1: session_input_channel_req: session 0 req pty-req
+debug1: Allocating pty.
+debug1: session_new: session 0
+debug1: SELinux support disabled
+debug1: session_pty_req: session 0 alloc /dev/pts/1
+debug1: server_input_channel_req: channel 0 request env reply 0
+debug1: session_by_channel: session 0 channel 0
+debug1: session_input_channel_req: session 0 req env
+debug1: server_input_channel_req: channel 0 request env reply 0
+debug1: session_by_channel: session 0 channel 0
+debug1: session_input_channel_req: session 0 req env
+debug1: server_input_channel_req: channel 0 request env reply 0
+debug1: session_by_channel: session 0 channel 0
+debug1: session_input_channel_req: session 0 req env
+debug1: server_input_channel_req: channel 0 request env reply 0
+debug1: session_by_channel: session 0 channel 0
+debug1: session_input_channel_req: session 0 req env
+debug1: server_input_channel_req: channel 0 request env reply 0
+debug1: session_by_channel: session 0 channel 0
+debug1: session_input_channel_req: session 0 req env
+debug1: server_input_channel_req: channel 0 request env reply 0
+debug1: session_by_channel: session 0 channel 0
+debug1: session_input_channel_req: session 0 req env
+debug1: server_input_channel_req: channel 0 request env reply 0
+debug1: session_by_channel: session 0 channel 0
+debug1: session_input_channel_req: session 0 req env
+debug1: server_input_channel_req: channel 0 request env reply 0
+debug1: session_by_channel: session 0 channel 0
+debug1: session_input_channel_req: session 0 req env
+debug1: server_input_channel_req: channel 0 request env reply 0
+debug1: session_by_channel: session 0 channel 0
+debug1: session_input_channel_req: session 0 req env
+debug1: server_input_channel_req: channel 0 request env reply 0
+debug1: session_by_channel: session 0 channel 0
+debug1: session_input_channel_req: session 0 req env
+debug1: server_input_channel_req: channel 0 request shell reply 1
+debug1: session_by_channel: session 0 channel 0
+debug1: session_input_channel_req: session 0 req shell
+Starting session: shell on pts/1 for sjmuniz from 192.168.99.169 port 57998 id 0
+debug1: Setting controlling tty using TIOCSCTTY.
+
+and we get a sheel at the client side.
+
+
+
+
